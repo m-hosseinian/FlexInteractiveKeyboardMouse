@@ -1,14 +1,19 @@
 #include "mpr121.h"
 #include "i2c.h"
 
+
+
+
 #define isHold(i) (holds & (1 << i)) && !(lastHolds & (1 << i)) 
 #define isUnhold(i) (lastHolds & (1 << i)) && !(holds & (1 << i))
+#define holdTimeOut  ((millis() - lastHoldMillis) > timeOut)
+#define mouseMoveTimeOut  ((millis() - lastMouseMove) > timeOut)
 
 /* Library variables */
 int ROW_NUM = 4;
 int COL_NUM = 3;
 
-double touchThreshold = 0.95;
+double touchThreshold = 0.98;
 double pressThreshold = 0.38;
 
 boolean touch[12] = {false,false,false,false,false,false,false,false};
@@ -57,6 +62,8 @@ unsigned long lastButtonTouchMilis = 0;
 unsigned long newPinTouchMilis;
 unsigned long lastPinTouchMilis = 0;
 
+unsigned long lastMouseMove = 0;
+
 int movement;
 
 int mouseMap[4][4] = {
@@ -92,6 +99,8 @@ int moveMap[16][16] = {
 boolean keyboardClosed = false;
 boolean lowerHalfHold = false;
 boolean upperHalfHold = false;
+boolean gHold = false;
+unsigned long lastHoldMillis = 0;
 
 void setup()
 {
@@ -112,6 +121,12 @@ void setup()
 
 void loop()
 {
+    if (!holdTimeOut || !mouseMoveTimeOut || gHold) {
+        pressThreshold = 0.1;
+    } else {
+        pressThreshold = 0.38;
+    }
+    
     populateInteractions();
 
     for (int i = 0; i < 8; i++) {
@@ -129,6 +144,7 @@ void loop()
         checkUpperHalfReleased();
     }
   
+    checkAnyHold();
     checkKeyboardClosed();
     checkKeyboardOpen();
     lastHolds = holds;
@@ -144,6 +160,7 @@ void handleMouse(int pin) {
         touchIndex = (touchIndex + 1) % 2;
         touchWin[touchIndex] = pin;
         if (touchIndex == 1) {
+            //Serial.println("mouse window full");
             resetKeyboardWin();
             if(touchWin[1] > touchWin[0]){
                 processTouchedPins(touchWin[0], touchWin[1] - 4);
@@ -207,6 +224,7 @@ void handleHold(int pin) {
     /* Hold code */
     if (isHold(pin)) {
         isHold[pin] = true;
+        
     }
     
     if (isUnhold(pin)) {
@@ -214,6 +232,17 @@ void handleHold(int pin) {
     }
 }
 
+void checkAnyHold()
+{
+    if(holds == 0) {
+        if (gHold)
+            lastHoldMillis = millis();
+        gHold = false;
+        
+    } else {  
+        gHold = true;
+    }
+}
 
 
 /* Extra Interaction library */
@@ -305,41 +334,101 @@ void moveMouse(int source, int dest)
         } // else: error, it's caught in the following switch/case
     }
     
-    switch(movement) {
+    
+      switch(movement) {
         case 0://Up
-            Serial.println(" => Up. ");
-            Mouse.move(0, -1 * mouseStep, 0);
+            if(gHold == true || !holdTimeOut){
+                Serial.println(" => Multitouch Up. ");
+                Mouse.move(0, 0, mouseStep);
+                lastHoldMillis = millis();
+            }
+            else{
+                Serial.println(" => Up. ");
+                Mouse.move(0, -1 * mouseStep, 0);
+                lastMouseMove = millis();
+            }
         break;
         case 1://Up Right
-            Serial.println(" => Up Right. ");
-            Mouse.move(0, -1 * mouseStep, 0);
+            if(gHold == true || !holdTimeOut){
+                Serial.println(" => Multitouch Up Right. ");
+                lastHoldMillis = millis();
+            }
+            else{
+                Serial.println(" => Up Right. ");
+                Mouse.move(mouseStep, -1 * mouseStep, 0);
+                lastMouseMove = millis();
+            }
         break;
         case 2://Right 
-            Serial.println(" => Right. ");
-            Mouse.move(mouseStep, 0, 0);
+            if(gHold == true || !holdTimeOut){
+                Serial.println(" => Multitouch Right. ");
+                Keyboard.print("=");
+                lastHoldMillis = millis();
+            }
+            else{
+                Serial.println(" => Right. ");
+                Mouse.move(mouseStep, 0, 0);
+                lastMouseMove = millis();
+            }
         break;
         case 3://Up Left
-            Serial.println(" => Up Left. ");
-            Mouse.move(-1 * mouseStep, -1 * mouseStep, 0);
+            if(gHold == true || !holdTimeOut){
+                Serial.println(" => Multitouch Up Left. ");
+                lastHoldMillis = millis();
+            }
+            else{
+                Serial.println(" => Up Left. ");
+                Mouse.move(-1 * mouseStep, -1 * mouseStep, 0);
+                lastMouseMove = millis();
+            }
         break;
         case 4://Down
-            Serial.println(" => Down. ");
-            Mouse.move(0, mouseStep, 0);
+            if(gHold == true || !holdTimeOut){
+                Serial.println(" => Multitouch Down. ");
+                Mouse.move(0, 0, -1 * mouseStep);
+                lastHoldMillis = millis();
+            }
+            else{
+                Serial.println(" => Down. ");
+                Mouse.move(0, mouseStep, 0);
+                lastMouseMove = millis();
+            }
         break;
         case 5://Down Left
-            Serial.println(" => Down Left. ");
-            Mouse.move(-1 * mouseStep, mouseStep, 0);
+            if(gHold == true || !holdTimeOut){
+                Serial.println(" => Multitouch Down Left. ");
+                lastHoldMillis = millis();
+            }
+            else{
+                Serial.println(" => Down Left. ");
+                Mouse.move(-1 * mouseStep, mouseStep, 0);
+                lastMouseMove = millis();
+            }
         break;
         case 6://Left
-           Serial.println(" => Left. ");
-           Mouse.move(-1 * mouseStep, 0, 0);
+            if(gHold == true || !holdTimeOut){
+                Serial.println(" => Multitouch Left. ");
+                Keyboard.print("-");
+                lastHoldMillis = millis();
+            }
+            else{
+                Serial.println(" => Left. ");
+                Mouse.move(-1 * mouseStep, 0, 0);
+                lastMouseMove = millis();
+            }
         break;
         case 7://Down Right
-            Serial.println(" => Down Right. ");
-            Mouse.move(mouseStep, mouseStep, 0);
+            if(gHold == true || !holdTimeOut){
+                Serial.println(" => Multitouch Down Right. ");
+                lastHoldMillis = millis();
+            }
+            else{
+                Serial.println(" => Down Right. ");
+                Mouse.move(mouseStep, mouseStep, 0);
+                lastMouseMove = millis();
+            }
         break;
         default:
-            Serial.println(" => Awch. ");
             resetMouseWins();
         return;
     }
@@ -360,6 +449,7 @@ void keyboardPrintChar(int row, int col) {
     }
     Serial.print("(");Serial.print(row);Serial.print(", ");Serial.print(col);
     Serial.print(") => ");Serial.println(keyboardMap[row][col]);
+
     Keyboard.print(keyboardMap[row][col]);
     resetKeyboardWin();
 }
@@ -406,7 +496,7 @@ void populateInteractions()
                     pinPressedMillis[i] = millis();
                 }
               
-                if (!hold[i] && ((millis() - pinPressedMillis[i]) > (timeOut / 2))) { // pin is hold
+                if (!hold[i] && ((millis() - pinPressedMillis[i]) > (timeOut / 3))) { // pin is hold
                     hold[i] = true;
                     fireHold(i);
                 }
