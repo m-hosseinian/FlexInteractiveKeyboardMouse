@@ -93,9 +93,6 @@ boolean keyboardClosed = false;
 boolean lowerHalfHold = false;
 boolean upperHalfHold = false;
 
-/* Hold variables */
-
-
 void setup()
 {
     //configure serial out
